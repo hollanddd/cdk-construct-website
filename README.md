@@ -51,7 +51,7 @@ import { HostedZone, ARecord, RecordTarget } from '@aws-cdk/aws-route53';
 import { CloudFrontTarget } from '@aws-cdk/aws-route53-targets';
 import { DnsValidatedCertificate } from '@aws-cdk/aws-certificatemanager';
 
-export class Example extends cdk.Stack {
+export class ExampleStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -65,12 +65,14 @@ export class Example extends cdk.Stack {
       description: 'Route53 Hosted Zone Id'
     })
 
+    const hostedZone = HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+      hostedZoneId: hostedZoneId.valueAsString,
+      zoneName: domainName.valueAsString
+    })
+
     const cert = new DnsValidatedCertificate(this, 'AwsManagedCertificate', {
       domainName: domainName.valueAsString,
-      hostedZone: HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
-        hostedZoneId: hostedZoneId.valueAsString,
-        zoneName: domainName.valueAsString
-      }),
+      hostedZone: hostedZone,
       subjectAlternativeNames: [`*.${domainName.valueAsString}`]
     });
 
@@ -87,10 +89,7 @@ export class Example extends cdk.Stack {
     });
 
     new ARecord(this, 'WebAliasRecord', {
-      zone: HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
-        hostedZoneId: hostedZoneId.valueAsString,
-        zoneName: domainName.valueAsString
-      }),
+      zone: hostedZone,
       recordName: domainName.valueAsString,
       target: RecordTarget.fromAlias(new CloudFrontTarget(website.distribution)),
     });
