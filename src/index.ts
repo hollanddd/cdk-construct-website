@@ -2,10 +2,10 @@ import { CloudFrontWebDistribution, CloudFrontWebDistributionProps, OriginAccess
 import { Bucket, BlockPublicAccess } from '@aws-cdk/aws-s3';
 import { Construct, RemovalPolicy, Duration } from '@aws-cdk/core';
 
-interface WebsiteProps {
-  domainName?: string;
-  logExpiration?: Duration;
-  certificateArn?: string;
+export interface WebsiteProps {
+  readonly domainName?: string;
+  readonly logExpiration?: Duration;
+  readonly certificateArn?: string;
 }
 
 export class Website extends Construct {
@@ -27,11 +27,6 @@ export class Website extends Construct {
 
     this.bucket.grantRead(oai);
 
-    let args = { ...props };
-    if (!props || props.logExpiration == undefined) {
-      args.logExpiration = Duration.days(14);
-    }
-
     let distroProps: CloudFrontWebDistributionProps = {
       errorConfigurations: [{
         errorCode: 404,
@@ -44,7 +39,7 @@ export class Website extends Construct {
           blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
           lifecycleRules: [{
             enabled: true,
-            expiration: args.logExpiration,
+            expiration: (props && props.logExpiration) ? props.logExpiration : Duration.days(14),
           }],
         }),
         prefix: 'website',
@@ -61,8 +56,8 @@ export class Website extends Construct {
       ],
     };
 
-    if (args.domainName !== undefined && args.certificateArn !== undefined) {
-      distroProps = this.addViewerCertificate(distroProps, [args.domainName], args.certificateArn);
+    if (props && props.domainName !== undefined && props.certificateArn !== undefined) {
+      distroProps = this.addViewerCertificate(distroProps, [props.domainName], props.certificateArn);
     }
 
     this.distribution = new CloudFrontWebDistribution(this, `${id}-distribution`, distroProps);
