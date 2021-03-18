@@ -3,7 +3,7 @@ const { AwsCdkConstructLibrary } = require('projen');
 const project = new AwsCdkConstructLibrary({
   author: 'Darren',
   authorAddress: 'me@darrenholland.com',
-  cdkVersion: '1.93.0',
+  cdkVersion: '1.94.0',
   defaultReleaseBranch: 'main',
   jsiiFqn: 'projen.AwsCdkConstructLibrary',
   name: 'cdk-construct-website',
