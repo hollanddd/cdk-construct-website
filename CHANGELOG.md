@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.6](https://github.com/hollanddd/cdk-construct-website/compare/v0.0.5...v0.0.6) (2021-03-25)
+
+
+### Bug Fixes
+
+* anti tamper warning ([1860243](https://github.com/hollanddd/cdk-construct-website/commit/186024335db2fe1d8bf5cfe7c9b0a74cafb1494b))
+
 ### [0.0.5](https://github.com/hollanddd/cdk-construct-website/compare/v0.0.4...v0.0.5) (2021-03-18)
 
 ### [0.0.4](https://github.com/hollanddd/cdk-construct-website/compare/v0.0.3...v0.0.4) (2021-03-06)
