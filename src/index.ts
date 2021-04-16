@@ -1,7 +1,16 @@
-import { CloudFrontWebDistribution, CloudFrontWebDistributionProps, OriginAccessIdentity, LambdaEdgeEventType } from '@aws-cdk/aws-cloudfront';
+import {
+  CloudFrontAllowedMethods,
+  CloudFrontAllowedCachedMethods,
+  CloudFrontWebDistribution,
+  CloudFrontWebDistributionProps,
+  LambdaEdgeEventType,
+  OriginAccessIdentity
+} from '@aws-cdk/aws-cloudfront';
+// namespace Function to avoid collision
+// https://github.com/aws/aws-cdk/issues/13991
+import * as lambda from '@aws-cdk/aws-lambda';
 import { Bucket, BlockPublicAccess } from '@aws-cdk/aws-s3';
 import { Construct, RemovalPolicy, Duration } from '@aws-cdk/core';
-import * as lambda from '@aws-cdk/aws-lambda';
 
 export interface WebsiteProps {
   readonly domainName?: string;
@@ -11,8 +20,9 @@ export interface WebsiteProps {
 }
 
 export class Website extends Construct {
-  public distribution: CloudFrontWebDistribution
-  public bucket: Bucket
+  public distribution: CloudFrontWebDistribution;
+  public bucket: Bucket;
+  private oai: OriginAccessIdentity;
 
   constructor(scope: Construct, id: string, props?: WebsiteProps) {
     super(scope, id);
@@ -23,11 +33,11 @@ export class Website extends Construct {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
     });
 
-    const oai = new OriginAccessIdentity(this, `${id}-oai`, {
+    this.oai = new OriginAccessIdentity(this, `${id}-oai`, {
       comment: `OAI for ${this.bucket.bucketName} website`,
     });
 
-    this.bucket.grantRead(oai);
+    this.bucket.grantRead(this.oai);
 
     let distroProps: CloudFrontWebDistributionProps = {
       errorConfigurations: [{
@@ -49,11 +59,20 @@ export class Website extends Construct {
       },
       originConfigs: [
         {
-          s3OriginSource: {
+          s3OriginSource: { // serve static assets directly from s3
+            originPath: '/*.*',
             s3BucketSource: this.bucket,
-            originAccessIdentity: oai,
+            originAccessIdentity: this.oai,
           },
-          behaviors: [{ isDefaultBehavior: true }],
+          behaviors: [{
+            allowedMethods: CloudFrontAllowedMethods.GET_HEAD,
+            cachedMethods: CloudFrontAllowedCachedMethods.GET_HEAD,
+            compress: true,
+            forwardedValues: {
+              queryString: false, // not needed for static assets
+              cookies: { forward: 'none' }
+            },
+          }],
         },
       ],
     };
@@ -73,16 +92,29 @@ export class Website extends Construct {
     const handlerVersion = new lambda.Version(this, 'OriginHandlerVersion', {
       lambda: handler,
     });
-    // TODO: we rely on only one item in each collection
-    props.originConfigs[0].behaviors[0] = {
-      isDefaultBehavior: true,
-      lambdaFunctionAssociations: [
-        {
-          eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
-          lambdaFunction: handlerVersion,
-        }
-      ],
-    };
+    props.originConfigs.push({
+      s3OriginSource: {
+            originPath: '/*', // serve ssr paths to lambda@edge
+            s3BucketSource: this.bucket,
+            originAccessIdentity: this.oai,
+      },
+      behaviors: [{
+        allowedMethods: CloudFrontAllowedMethods.GET_HEAD_OPTIONS,
+        cachedMethods: CloudFrontAllowedCachedMethods.GET_HEAD,
+        compress: true,
+        isDefaultBehavior: true,
+        forwardedValues: {
+          queryString: true,
+          cookies: { forward: 'none' },
+        },
+        lambdaFunctionAssociations: [
+          {
+            eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+            lambdaFunction: handlerVersion,
+          }
+        ],
+      }],
+    });
     return props;
   }
 
