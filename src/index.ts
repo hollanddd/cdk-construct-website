@@ -1,11 +1,13 @@
-import { CloudFrontWebDistribution, CloudFrontWebDistributionProps, OriginAccessIdentity } from '@aws-cdk/aws-cloudfront';
+import { CloudFrontWebDistribution, CloudFrontWebDistributionProps, OriginAccessIdentity, LambdaEdgeEventType } from '@aws-cdk/aws-cloudfront';
 import { Bucket, BlockPublicAccess } from '@aws-cdk/aws-s3';
 import { Construct, RemovalPolicy, Duration } from '@aws-cdk/core';
+import * as lambda from '@aws-cdk/aws-lambda';
 
 export interface WebsiteProps {
   readonly domainName?: string;
   readonly logExpiration?: Duration;
   readonly certificateArn?: string;
+  readonly originRequestHandler?: lambda.Function;
 }
 
 export class Website extends Construct {
@@ -60,7 +62,28 @@ export class Website extends Construct {
       distroProps = this.addViewerCertificate(distroProps, [props.domainName], props.certificateArn);
     }
 
+    if (props && props.originRequestHandler) {
+      distroProps = this.addOriginRequestHandler(distroProps, props.originRequestHandler);
+    }
+
     this.distribution = new CloudFrontWebDistribution(this, `${id}-distribution`, distroProps);
+  }
+
+  private addOriginRequestHandler(props: CloudFrontWebDistributionProps, handler: lambda.Function): CloudFrontWebDistributionProps {
+    const handlerVersion = new lambda.Version(this, 'OriginHandlerVersion', {
+      lambda: handler,
+    });
+    // TODO: we rely on only one item in each collection
+    props.originConfigs[0].behaviors[0] = {
+      isDefaultBehavior: true,
+      lambdaFunctionAssociations: [
+        {
+          eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+          lambdaFunction: handlerVersion,
+        }
+      ],
+    };
+    return props;
   }
 
   private addViewerCertificate(props: CloudFrontWebDistributionProps, aliases: string[], acmCertificateArn: string): CloudFrontWebDistributionProps {
