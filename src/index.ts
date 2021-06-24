@@ -1,4 +1,11 @@
-import { CloudFrontWebDistribution, CloudFrontWebDistributionProps, OriginAccessIdentity } from '@aws-cdk/aws-cloudfront';
+import {
+  CloudFrontWebDistribution,
+  CloudFrontWebDistributionProps,
+  FunctionEventType,
+  OriginAccessIdentity,
+  Function as CloudFrontFunction,
+  FunctionCode,
+} from '@aws-cdk/aws-cloudfront';
 import { Bucket, BlockPublicAccess } from '@aws-cdk/aws-s3';
 import { Construct, RemovalPolicy, Duration } from '@aws-cdk/core';
 
@@ -51,7 +58,32 @@ export class Website extends Construct {
             s3BucketSource: this.bucket,
             originAccessIdentity: oai,
           },
-          behaviors: [{ isDefaultBehavior: true }],
+          behaviors: [{
+            isDefaultBehavior: true,
+            functionAssociations: [{
+              eventType: FunctionEventType.VIEWER_RESPONSE,
+              function: new CloudFrontFunction(this, 'AddRespSecurityHeaders', {
+                code: FunctionCode.fromInline(`
+                  function handler(event) {
+                    let { response: { headers } } = event;
+
+                    // Set HTTP security headers
+                    // Since JavaScript doesn't allow for hyphens in variable names, we use the dict["key"] notation 
+                    headers['x-content-type-options'] = { value: 'nosniff' };
+                    headers['x-frame-options']        = { value: 'DENY' };
+                    headers['x-xss-protection']       = { value: '1; mode=block' };
+                    headers['strict-transport-security'] = {
+                      value: 'max-age=63072000;
+                      includeSubdomains; preload'
+                    };
+                    headers['content-security-policy'] = {
+                      value: "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'"
+                    };
+                  }
+                `),
+              }),
+            }],
+          }],
         },
       ],
     };

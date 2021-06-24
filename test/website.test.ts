@@ -141,6 +141,43 @@ test('Configures distribution origin access identity (OAI)', () => {
   });
 });
 
+test('Creates viewer response CloudFront Function', () => {
+  const mockApp = new App();
+  const stack = new Stack(mockApp, 'testing-stack');
+
+  new Website(stack, 'testing');
+  expect(stack).toHaveResourceLike('AWS::CloudFront::Function', {
+    FunctionConfig: {
+      Runtime: 'cloudfront-js-1.0',
+    },
+  });
+});
+
+test('Configures distribution viewer response headers', () => {
+  const mockApp = new App();
+  const stack = new Stack(mockApp, 'testing-stack');
+
+  new Website(stack, 'testing');
+
+  expect(stack).toHaveResourceLike('AWS::CloudFront::Distribution', {
+    DistributionConfig: {
+      DefaultCacheBehavior: {
+        FunctionAssociations: [
+          {
+            EventType: 'viewer-response',
+            FunctionARN: {
+              'Fn::GetAtt': [
+                'testingAddRespSecurityHeadersFF07EB07',
+                'FunctionARN',
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+});
+
 test('Configures distribution custom error responses', () => {
   const mockApp = new App();
   const stack = new Stack(mockApp, 'testing-stack');
@@ -159,6 +196,7 @@ test('Configures distribution custom error responses', () => {
     },
   });
 });
+
 test('Allows domain name configuration', () => {
   const mockApp = new App();
   const stack = new Stack(mockApp, 'testing-stack');
@@ -198,7 +236,7 @@ test('Enables distribution logging', () => {
   });
 });
 
-test('Default log expiration to 14 days', () => {
+test('Defaults log expiration to 14 days', () => {
   const mockApp = new App();
   const stack = new Stack(mockApp, 'testing-stack');
 
@@ -210,7 +248,7 @@ test('Default log expiration to 14 days', () => {
   });
 });
 
-test('Allow log life cycle configuration', () => {
+test('Allows log life cycle configuration', () => {
   const mockApp = new App();
   const stack = new Stack(mockApp, 'testing-stack');
 
